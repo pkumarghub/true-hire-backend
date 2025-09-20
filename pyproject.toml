@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+
+[project]
+name = "resume-jd-semantic-search"
+version = "0.1.0"
+description = "Semantic resume-to-job matching with LangChain, ChromaDB and Streamlit"
+authors = [{ name = "Prashant Kumar", email = "you@example.com" }]
+license = "MIT"
+readme = "README.md"
+requires-python = ">=3.10"
+
+dependencies = [
+  "langchain",
+  "langchain-core",
+  "langchain-community",
+  "langchain-openai",
+  "langchain-google-genai",
+  "chromadb",
+  "fastapi",
+  "uvicorn[standard]",
+  "python-multipart",
+  "python-docx",
+  "docx2txt",
+  "pypdf",
+  "sentence-transformers",
+  "openai",
+  "google-generativeai",
+  "python-dotenv",
+  "requests",
+]
+
+[tool.uv]
+dev-dependencies = [
+  "pytest",
+  "black",
+  "ruff"
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
