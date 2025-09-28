@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import os
-from typing import Iterable, List, Optional, Tuple
+from typing import Iterable, List, Optional, Tuple, Union
 
 import chromadb
 from chromadb.api.models.Collection import Collection
 from langchain_core.documents import Document
+from langchain_core.embeddings import Embeddings
 
 
 class ChromaClient:
@@ -18,6 +19,7 @@ class ChromaClient:
         return self.client.get_or_create_collection(name=collection_name)
 
     def add_documents(self, collection_name: str, docs: Iterable[Document]) -> List[str]:
+        """Add documents using ChromaDB's default embedding function"""
         collection = self.create_collection(collection_name)
         ids: List[str] = []
         metadatas = []
@@ -29,6 +31,50 @@ class ChromaClient:
             texts.append(d.page_content)
         if ids:
             collection.add(ids=ids, metadatas=metadatas, documents=texts)
+        return ids
+
+    def add_documents_with_embeddings(
+        self, 
+        collection_name: str, 
+        docs: Iterable[Document], 
+        embeddings: Embeddings
+    ) -> List[str]:
+        """
+        Add documents with custom embeddings using the specified embedding provider.
+        
+        Args:
+            collection_name: Name of the ChromaDB collection
+            docs: Iterable of Document objects to store
+            embeddings: Embedding provider instance
+            
+        Returns:
+            List of document IDs that were stored
+        """
+        collection = self.create_collection(collection_name)
+        ids: List[str] = []
+        metadatas = []
+        texts = []
+        embedding_vectors = []
+        
+        for d in docs:
+            doc_id = d.metadata.get("id") or d.metadata.get("source") or str(len(ids))
+            ids.append(str(doc_id))
+            metadatas.append(d.metadata)
+            texts.append(d.page_content)
+            
+            # Generate embedding for this document
+            embedding_vector = embeddings.embed_query(d.page_content)
+            embedding_vectors.append(embedding_vector)
+        
+        if ids:
+            collection.add(
+                ids=ids, 
+                metadatas=metadatas, 
+                documents=texts,
+                embeddings=embedding_vectors
+            )
+            print(f"Stored {len(ids)} documents with custom embeddings in collection '{collection_name}'")
+        
         return ids
 
     def similarity_search(self, collection_name: str, query: str, k: int = 5) -> List[Tuple[Document, float]]:

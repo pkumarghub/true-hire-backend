@@ -16,7 +16,6 @@ class CVController:
         self,
         num_shortlisted: int,
         llm_provider: str,
-        embedding_provider: str,
         jd_file: Optional[UploadFile],
         jd_text: Optional[str],
         cv_files: List[UploadFile]
@@ -33,14 +32,10 @@ class CVController:
         if llm_provider not in ["openai", "gemini"]:
             raise HTTPException(status_code=400, detail="LLM provider must be 'openai' or 'gemini'")
         
-        if embedding_provider not in ["openai", "gemini", "local"]:
-            raise HTTPException(status_code=400, detail="Embedding provider must be 'openai', 'gemini', or 'local'")
-        
         try:
             return await self.cv_service.shortlist_cvs(
                 num_shortlisted=num_shortlisted,
                 llm_provider=llm_provider,
-                embedding_provider=embedding_provider,
                 jd_file=jd_file,
                 jd_text=jd_text,
                 cv_files=cv_files

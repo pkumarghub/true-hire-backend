@@ -16,7 +16,6 @@ dependencies = [
   "langchain-community",
   "langchain-openai",
   "langchain-google-genai",
-  "chromadb",
   "fastapi",
   "uvicorn[standard]",
   "python-multipart",
@@ -28,6 +27,7 @@ dependencies = [
   "google-generativeai",
   "python-dotenv",
   "requests",
+  "chromadb>=1.1.0",
 ]
 
 [tool.uv]

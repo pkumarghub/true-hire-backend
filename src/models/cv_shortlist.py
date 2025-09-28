@@ -6,7 +6,6 @@ class CVShortlistRequest(BaseModel):
     """Request model for CV shortlisting"""
     num_shortlisted: int = Field(ge=1, le=50, description="Number of CVs to shortlist")
     llm_provider: str = Field(description="LLM provider: 'openai' or 'gemini'")
-    embedding_provider: str = Field(description="Embedding provider: 'openai', 'gemini', or 'local'")
     jd_text: Optional[str] = Field(None, description="Job description as text")
     
     class Config:
@@ -14,7 +13,6 @@ class CVShortlistRequest(BaseModel):
             "example": {
                 "num_shortlisted": 3,
                 "llm_provider": "openai",
-                "embedding_provider": "local",
                 "jd_text": "We are looking for a Python developer with experience in FastAPI..."
             }
         }
@@ -35,3 +33,4 @@ class CVShortlistResponse(BaseModel):
     shortlisted_candidates: List[Candidate]
     total_candidates_processed: int
     jd_summary: Optional[str] = None
+    job_description_id: Optional[str] = Field(None, description="ID of the stored job description")
