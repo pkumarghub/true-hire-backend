@@ -19,15 +19,18 @@ cv_controller = CVController(cv_service)
 
 @cv_router.post("/shortlist-cvs", response_model=CVShortlistResponse)
 async def shortlist_cvs(
-    num_shortlisted: int = Form(ge=1, le=50, description="Number of CVs to shortlist"),
+    num_shortlisted: int = Form(
+        ge=1, le=50, description="Number of CVs to shortlist"),
     llm_provider: str = Form(description="LLM provider: 'openai' or 'gemini'"),
-    jd_file: Optional[UploadFile] = File(None, description="Job description file (.pdf/.docx/.txt)"),
+    jd_file: Optional[UploadFile] = File(
+        None, description="Job description file (.pdf/.docx/.txt)"),
     jd_text: Optional[str] = Form(None, description="Job description as text"),
-    cv_files: List[UploadFile] = File(..., description="CV files (.pdf/.docx/.txt)")
+    cv_files: List[UploadFile] = File(...,
+                                      description="CV files (.pdf/.docx/.txt)")
 ):
     """
     Shortlist CVs based on Job Description matching
-    
+
     This endpoint processes uploaded CVs and shortlists the best matches
     based on semantic similarity with the provided job description.
     """
@@ -41,6 +44,8 @@ async def shortlist_cvs(
 
 #################  BOC - Begin of ChromaDB check #################
 ################# Temprory router for ChromaDB check #################
+
+
 @cv_router.get("/db-check")
 async def db_check():
     """Check if the ChromaDB is accessible and list collections with full data"""
@@ -48,13 +53,13 @@ async def db_check():
         # Get all collections from ChromaDB
         collections = chroma_client.client.list_collections()
         collection_names = [collection.name for collection in collections]
-        
+
         # Get complete data for each collection
         collection_info = []
         for collection in collections:
             # Get all documents from the collection (excluding embeddings to avoid numpy array issues)
             all_documents = collection.get(include=["metadatas", "documents"])
-            
+
             # Format documents for better readability
             documents_data = []
             if all_documents.get("ids"):
@@ -63,10 +68,11 @@ async def db_check():
                         "id": all_documents["ids"][i],
                         "document": all_documents["documents"][i] if all_documents.get("documents") and len(all_documents["documents"]) > i else None,
                         "metadata": all_documents["metadatas"][i] if all_documents.get("metadatas") and len(all_documents["metadatas"]) > i else None,
-                        "embedding_available": collection.count() > 0  # Just indicate if embeddings exist
+                        # Just indicate if embeddings exist
+                        "embedding_available": collection.count() > 0
                     }
                     documents_data.append(doc_data)
-            
+
             collection_info.append({
                 "name": collection.name,
                 "id": collection.id,
@@ -74,15 +80,16 @@ async def db_check():
                 "count": collection.count(),
                 "documents": documents_data
             })
-        
+
         return {
-            "status": "success", 
+            "status": "success",
             "collections": collection_names,
             "collection_details": collection_info,
             "total_collections": len(collections)
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
 
 @cv_router.get("/db-purge")
 async def db_purge():
@@ -99,3 +106,5 @@ async def db_purge():
         return {"status": "success", "message": f"Collection  purged successfully"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+

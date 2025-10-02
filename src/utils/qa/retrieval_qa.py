@@ -9,8 +9,8 @@ from langchain_core.runnables import RunnableParallel, RunnablePassthrough, Runn
 
 SUMMARY_SYSTEM = (
     "You are an expert technical recruiter. Summarize the candidate vs JD. "
-    "Return: strengths (bullets), gaps (bullets), skill_match_percent (0-100), "
-    "and 3 suggested interview questions. Be concise."
+    "Return: strengths (bullets), gaps (bullets), skill_match_percent (0-100)"
+    "Be concise."
 )
 
 PROMPT = ChatPromptTemplate.from_messages(

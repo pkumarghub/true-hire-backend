@@ -1,4 +1,3 @@
-import os
 import tempfile
 import uuid
 from datetime import datetime
@@ -7,16 +6,15 @@ from typing import List, Optional
 
 from fastapi import UploadFile
 from langchain_core.documents import Document
-from langchain_core.embeddings import Embeddings
 
 from src.models.cv_shortlist import CVShortlistResponse, Candidate
 from src.services.file_service import FileService
 from src.vectorstore.chroma_client import ChromaClient
-from src.utils.embeddings.embeddings_factory import get_embeddings
 from src.utils.retriever.retriever_factory import build_retriever
 from src.utils.qa.retrieval_qa import build_retrieval_qa_chain
 from src.utils.llm.openai_llm import get_openai_llm
 from src.utils.llm.gemini_llm import get_gemini_llm
+from src.utils.metadata_extractor import extract_parameters_with_llm, candidate_key_params
 
 
 class CVService:
@@ -28,21 +26,9 @@ class CVService:
         self.collection_job_descriptions_base = "job_descriptions"
         self.file_service = FileService()
 
-    def _get_collection_name(self, base_name: str) -> str:
+    async def _store_job_description(self, jd_text: str) -> str:
         """
-        Generate collection name based on embedding provider to avoid dimension conflicts.
-
-        Args:
-            base_name: Base collection name (e.g., 'resumes', 'job_descriptions')
-
-        Returns:
-            str: Collection name with provider suffix
-        """
-        return f"{base_name}"
-
-    def _store_job_description(self, jd_text: str) -> str:
-        """
-        Store job description in ChromaDB with embeddings using the specified provider.
+        Store job description in ChromaDB.
 
         Args:
             jd_text: The job description text to store
@@ -51,19 +37,17 @@ class CVService:
             str: The document ID of the stored job description
 
         Raises:
-            ValueError: If embedding provider is invalid or JD text is empty
+            ValueError: If JD text is empty
             RuntimeError: If there's an error storing the document
         """
         if not jd_text or not jd_text.strip():
             raise ValueError("Job description text cannot be empty")
 
-
         try:
             # Generate unique ID for this job description
             jd_id = f"jd_{uuid.uuid4().hex[:12]}_{int(datetime.now().timestamp())}"
 
-            # Get the specified embedding model
-            embeddings = get_embeddings()
+            llm_metadata_response = extract_parameters_with_llm(jd_text.strip(), candidate_key_params)
 
             jd_doc = []
             # Create document with metadata
@@ -73,23 +57,18 @@ class CVService:
                     "id": jd_id,
                     "doc_type": "job_description",
                     "created_at": datetime.now().isoformat(),
-                    "source": "api_upload"
+                    "source": "api_upload",
+                    **llm_metadata_response
                 }
             )
 
             jd_doc.append(jd_document)
 
-            # Generate embeddings using the specified provider
-            embedding_vector = embeddings.embed_query(jd_text.strip())
-            print(
-                f"Generated embedding vector with {len(embedding_vector)} dimensions")
-
             # Store in ChromaDB with explicit embeddings using provider-specific collection
-            collection_name = self._get_collection_name(
-                self.collection_job_descriptions_base)
+            collection_name = self.collection_job_descriptions_base
 
-            self.chroma_client.add_documents_with_embeddings(
-                collection_name, jd_doc, embeddings
+            await self.chroma_client.add_documents_with_embeddings(
+                collection_name, jd_doc
             )
 
             print(
@@ -133,7 +112,7 @@ class CVService:
             try:
                 # Validate embedding provider availability
                 try:
-                    stored_jd_id = self._store_job_description(
+                    stored_jd_id = await self._store_job_description(
                         final_jd_text)
                     print(
                         f"Job description stored with ID: {stored_jd_id}")
@@ -146,7 +125,6 @@ class CVService:
                         raise e
             except Exception as e:
                 print(f"Warning: Could not store job description: {e}")
-                # Continue with shortlisting even if JD storage fails
 
             # Process CVs
             cv_docs = []
@@ -159,6 +137,7 @@ class CVService:
                 for i, content in enumerate(cv_contents):
                     # Generate unique ID for each CV document
                     cv_id = f"cv_{uuid.uuid4().hex[:12]}_{int(datetime.now().timestamp())}_{i}"
+                    llm_metadata_response = extract_parameters_with_llm(content.strip(), candidate_key_params)
 
                     doc = Document(
                         page_content=content,
@@ -167,7 +146,8 @@ class CVService:
                             "source": cv_file.filename,
                             "doc_type": "resume",
                             "page": i + 1,
-                            "created_at": datetime.now().isoformat()
+                            "created_at": datetime.now().isoformat(),
+                            **llm_metadata_response
                         }
                     )
                     cv_docs.append(doc)
@@ -177,18 +157,15 @@ class CVService:
 
             # Index CVs with custom embeddings using provider-specific collection
             try:
-                cv_embeddings = get_embeddings()
-                collection_name = self._get_collection_name(
-                    self.collection_resumes_base)
-                self.chroma_client.add_documents_with_embeddings(
-                    collection_name, cv_docs, cv_embeddings
+                collection_name = self.collection_resumes_base
+                await self.chroma_client.add_documents_with_embeddings(
+                    collection_name, cv_docs
                 )
                 print(
                     f"Successfully stored {len(cv_docs)} CV documents with embeddings in collection '{collection_name}'")
             except RuntimeError as e:
                 if "API_KEY" in str(e):
-                    print(
-                        f"Warning: API key not configured. Raising error")
+                    print(f"Warning: API key not configured. Raising error")
                     raise e
                 else:
                     raise e
@@ -198,8 +175,7 @@ class CVService:
 
             # Perform similarity search using the same collection as CVs
             try:
-                collection_name = self._get_collection_name(
-                    self.collection_resumes_base)
+                collection_name = self.collection_resumes_base
                 results = self.chroma_client.similarity_search(
                     collection_name, final_jd_text, k=num_shortlisted
                 )
@@ -232,8 +208,7 @@ class CVService:
             # Generate summary using LLM (optional)
             jd_summary = None
             try:
-                collection_name = self._get_collection_name(
-                    self.collection_resumes_base)
+                collection_name = self.collection_resumes_base
                 retriever = build_retriever(
                     self.chroma_client, collection_name, k=3)
                 llm = get_openai_llm() if llm_provider == "openai" else get_gemini_llm()

@@ -6,7 +6,7 @@ from typing import Iterable, List, Optional, Tuple, Union
 import chromadb
 from chromadb.api.models.Collection import Collection
 from langchain_core.documents import Document
-from langchain_core.embeddings import Embeddings
+from utils.embeddings.embeddings_factory import embedding_factory
 
 
 class ChromaClient:
@@ -33,11 +33,10 @@ class ChromaClient:
             collection.add(ids=ids, metadatas=metadatas, documents=texts)
         return ids
 
-    def add_documents_with_embeddings(
+    async def add_documents_with_embeddings(
         self, 
         collection_name: str, 
         docs: Iterable[Document], 
-        embeddings: Embeddings
     ) -> List[str]:
         """
         Add documents with custom embeddings using the specified embedding provider.
@@ -45,7 +44,6 @@ class ChromaClient:
         Args:
             collection_name: Name of the ChromaDB collection
             docs: Iterable of Document objects to store
-            embeddings: Embedding provider instance
             
         Returns:
             List of document IDs that were stored
@@ -63,7 +61,7 @@ class ChromaClient:
             texts.append(d.page_content)
             
             # Generate embedding for this document
-            embedding_vector = embeddings.embed_query(d.page_content)
+            embedding_vector = await embedding_factory.embed(str(d.page_content))
             embedding_vectors.append(embedding_vector)
         
         if ids:
